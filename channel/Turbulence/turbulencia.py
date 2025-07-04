@@ -1,154 +1,87 @@
 # -*- coding: utf-8 -*-
 """
 Módulo para calcular la turbulencia y muestrear la transmisividad
-en función del ángulo de elevación, usando el perfil Cn² interpolado.
+en función del ángulo de elevación.
 
-Incluye:
-  - Funciones de Rytov y parámetros Gamma-Gamma.
-  - Muestreo de transmisividad (lognormal o Gamma-Gamma).
-  - Función principal get_turbulence_for_angle().
+Utiliza un modelo físicamente coherente que interpola la varianza de Rytov (sigma²)
+pre-calculada para cada ángulo, en lugar de un Cn² puntual.
 """
-
 import numpy as np
 from scipy.stats import lognorm
-import numpy.random as npr
+# Importamos la nueva función que nos devuelve el interpolador de sigma².
+from .cn2_interpolacion import get_f_sigma2
 
-# Importar solo la parte de interpolación de Cn²
-from .cn2_interpolacion import get_f_cn2
+# Es una buena práctica usar un generador de números aleatorios moderno y explícito.
+rng = np.random.default_rng()
 
-__all__ = [
-    'sigma_rytov', 'gamma_gamma_params', 'sample_transmissivity',
-    'get_turbulence_for_angle'
-]
+# La única función que este módulo necesita "exportar" es la principal.
+__all__ = ['get_turbulence_for_angle']
 
 
-def sigma_rytov(cn2_val, k, L):
+def _gamma_gamma_params(sigma_R2):
     """
-    Calcula la varianza de Rytov (σ²) para un valor de Cn² dado:
-      σ² = 1.23 * k^(7/6) * cn2_val * L^(11/6)
-
-    Parameters
-    ----------
-    cn2_val : float
-        Valor local de Cn² (m^(-2/3)).
-    k : float
-        Número de onda: k = 2π / λ (λ en metros).
-    L : float
-        Longitud de enlace en metros.
-
-    Returns
-    -------
-    σ² : float
-        Varianza de Rytov.
+    Calcula los parámetros a, b del modelo Gamma-Gamma de forma robusta.
+    Función interna, no se exporta.
     """
-    return 1.23 * (k**(7/6)) * cn2_val * (L**(11/6))
-
-
-def gamma_gamma_params(sigma_R2):
-    """
-    Calcula los parámetros a, b del modelo Gamma-Gamma a partir de σ² de Rytov:
-      a = 1 / [exp{0.49σ² / (1 + 1.11σ²^(12/5))^(7/6)} – 1]
-      b = 1 / [exp{0.51σ² / (1 + 0.69σ²^(12/5))^(5/6)} – 1]
-
-    Parameters
-    ----------
-    sigma_R2 : float
-        Varianza de Rytov (σ²).
-
-    Returns
-    -------
-    (a, b) : tuple de floats
-        Parámetros a y b para la distribución Gamma-Gamma.
-    """
-    a = 1.0 / (np.exp(0.49 * sigma_R2 / (1 + 1.11 * sigma_R2**(12/5))**(7/6)) - 1)
-    b = 1.0 / (np.exp(0.51 * sigma_R2 / (1 + 0.69 * sigma_R2**(12/5))**(5/6)) - 1)
+    # Se usa np.errstate para evitar warnings si sigma_R2 es muy grande.
+    with np.errstate(over='ignore', invalid='ignore'):
+        a_denom = np.exp(0.49 * sigma_R2 / (1 + 1.11 * sigma_R2**(12/5))**(7/6)) - 1
+        b_denom = np.exp(0.51 * sigma_R2 / (1 + 0.69 * sigma_R2**(12/5))**(5/6)) - 1
+    
+    # Si el denominador es cero o negativo, el parámetro es infinito (turbulencia extrema).
+    a = 1.0 / a_denom if a_denom > 0 else np.inf
+    b = 1.0 / b_denom if b_denom > 0 else np.inf
     return a, b
 
 
-def sample_transmissivity(cn2_val, k, L):
+def _sample_transmissivity(sigma2):
     """
-    Muestra un valor de transmisividad atmosférica a partir de Cn² y longitud de enlace:
-      - Si σ² < 1: modelo lognormal.
-      - Si σ² ≥ 1: modelo Gamma-Gamma.
-
-    Parameters
-    ----------
-    cn2_val : float
-        Valor local de Cn² (m^(-2/3)).
-    k : float
-        Número de onda: k = 2π / λ.
-    L : float
-        Longitud de enlace en metros.
-
-    Returns
-    -------
-    T : float
-        Valor muestreado de transmisividad (≥ 0).
+    Muestra un valor de transmisividad atmosférica a partir de una sigma² ya calculada.
+    Función interna, no se exporta.
     """
-    sigma2 = sigma_rytov(cn2_val, k, L)
+    if sigma2 <= 0:
+        return 1.0  # No hay fluctuaciones si no hay turbulencia.
 
     if sigma2 < 1.0:
-        μ = -0.5 * sigma2
+        # Régimen de turbulencia débil -> Lognormal
+        mu = -0.5 * sigma2
         s = np.sqrt(sigma2)
-        return lognorm(s=s, scale=np.exp(μ)).rvs()
+        # Usamos el generador moderno rng
+        return lognorm.rvs(s=s, scale=np.exp(mu), random_state=rng)
     else:
-        a, b = gamma_gamma_params(sigma2)
-        X = npr.gamma(shape=a, scale=1.0 / a)
-        Y = npr.gamma(shape=b, scale=1.0 / b)
+        # Régimen de turbulencia fuerte -> Gamma-Gamma
+        a, b = _gamma_gamma_params(sigma2)
+        
+        # Si los parámetros no son válidos (infinitos), la señal se ha perdido.
+        if not (np.isfinite(a) and np.isfinite(b) and a > 0 and b > 0):
+            return 0.0  # Desvanecimiento completo.
+            
+        # Muestreamos de dos distribuciones Gamma para obtener la Gamma-Gamma.
+        X = rng.gamma(shape=a, scale=1.0 / a)
+        Y = rng.gamma(shape=b, scale=1.0 / b)
         return X * Y
 
 
-def get_turbulence_for_angle(elev_deg, loss_params, wl, L):
+def get_turbulence_for_angle(elev_deg, loss_params):
     """
-    Dado un ángulo de elevación en grados y parámetros de pérdida, devuelve:
-      - cn2_loc  : Cn² interpolado en ese ángulo,
-      - sigma2   : varianza de Rytov σ²,
-      - T        : muestra de transmisividad.
-
-    Si loss_params['turbulencia'] es False o loss_params['tReadLoss'] es True,
-    devuelve (None, None, None).
-
-    Parameters
-    ----------
-    elev_deg : float
-        Ángulo de elevación en grados (0–90).
-    loss_params : dict
-        Debe contener:
-          - 'turbulencia' (bool): si False, omite el cálculo.
-          - 'tReadLoss' (bool): si True, omite el cálculo.
-          - 'tanda_label' (str): etiqueta de tanda para interpolar Cn².
-    wavelength : float
-        Longitud de onda en metros (e.g. 785e-9 para 785 nm).
-    L : float
-        Longitud de enlace en metros.
-
-    Returns
-    -------
-    (cn2_loc, sigma2, T) : tupla de floats o (None, None, None)
-        - cn2_loc : valor de Cn² interpolado en elev_deg.
-        - sigma2  : varianza de Rytov σ².
-        - T       : valor muestreado de transmisividad.
+    Dado un ángulo de elevación y los parámetros del sistema, devuelve la
+    varianza de Rytov y una muestra de transmisividad fluctuante.
     """
-    if not loss_params.get('turbulencia', False):
-        return None, None, None
+    # 1. Obtener la función de interpolación de sigma² (f(elev_rad) -> sigma²).
+    try:
+        f_sigma2 = get_f_sigma2(loss_params)
+    except ValueError as e:
+        print(f"Error al configurar la turbulencia: {e}")
+        return None, None
 
-    if loss_params.get('tReadLoss', False):
-        return None, None, None
-
-    # 1) Obtener función de interpolación de Cn² para la tanda indicada
-    f_cn2 = get_f_cn2(loss_params)
-
-    # 2) Convertir elevación a radianes y obtener Cn² local
+    # 2. Convertir el ángulo de elevación a radianes.
     elev_rad = np.radians(elev_deg)
-    cn2_loc = float(f_cn2(elev_rad))
 
-    # 3) Calcular número de onda k = 2π / λ
-    k = 2 * np.pi / wl
+    # 3. Obtener el valor de sigma² para este ángulo específico.
+    sigma2 = float(f_sigma2(elev_rad))
 
-    # 4) Calcular σ² de Rytov
-    sigma2 = sigma_rytov(cn2_loc, k, L)
+    # 4. Muestrear la transmisividad usando el valor de sigma².
+    T = _sample_transmissivity(sigma2)
 
-    # 5) Muestrear transmisividad según σ²
-    T = sample_transmissivity(cn2_loc, k, L)
-
-    return cn2_loc, sigma2, T
+    # 5. Devolver los dos valores físicos relevantes.
+    return sigma2, T

@@ -1,75 +1,76 @@
 # -*- coding: utf-8 -*-
 """
-Módulo para obtener una función de interpolación Cn²(elev_rad)
-a partir de una tanda específica.
-"""
+Módulo para obtener una función de interpolación para la varianza de Rytov (sigma²),
+basada en los datos de Cn² y los parámetros del sistema.
 
+Este módulo reemplaza la interpolación de Cn² por una interpolación directa
+de sigma², que es físicamente más coherente.
+"""
 import numpy as np
 from scipy.interpolate import interp1d
+# Importamos los datos necesarios desde tu archivo de datos.
+# El 'as' renombra las variables para mayor claridad.
+from .pasosCn2 import tandas, elev as elev_deg, cn2 as cn2_table
 
-# Importar tandas, elev y cn2 desde tu módulo de datos (datos_cn2.py)
-from .pasosCn2 import tandas, elev, cn2
+# La única función que este módulo ofrecerá a otros archivos será get_f_sigma2
+__all__ = ['get_f_sigma2']
 
-__all__ = ['make_f_cn2_local', 'get_f_cn2']
+# Diccionario para cachear funciones ya calculadas y mejorar la eficiencia
+_sigma2_cache = {}
 
-
-def make_f_cn2_local(tanda_label):
+def get_f_sigma2(loss_params):
     """
-    Crea una función de interpolación Cn² vs. elevación (en radianes)
-    para la tanda especificada.
+    Crea y devuelve una función que mapea el ángulo de elevación (en radianes)
+    directamente a la varianza de Rytov (sigma²).
 
-    Parameters
-    ----------
-    tanda_label : str
-        Etiqueta de la tanda, p.e. 'tanda3_14.05'.
-
-    Returns
-    -------
-    f_cn2 : callable
-        Función que acepta un ángulo de elevación en radianes y devuelve
-        el valor de Cn² interpolado en ese ángulo.
+    Utiliza los datos de Cn² de la tanda especificada y los parámetros del
+    sistema para pre-calcular una tabla de sigma².
     """
+    # Si la turbulencia está desactivada, devuelve una función que no hace nada (sigma²=0)
+    if not loss_params.get('turbulencia', False):
+        return lambda *args, **kwargs: 0.0
+        
+    # Extraemos los parámetros de la configuración
+    tanda_label = loss_params.get('tanda_label')
+    wl = loss_params.get('wavelength')
+    H_turb = loss_params.get('L') # Usamos L como la altura de la atmósfera turbulenta
+    
+    # Validamos que tenemos todo lo necesario
+    if not all([tanda_label, wl, H_turb]):
+        raise ValueError("loss_params debe contener 'tanda_label', 'wavelength' y 'L'.")
+        
+    # Usamos una clave para ver si ya hemos hecho este cálculo antes
+    cache_key = (tanda_label, wl, H_turb)
+    if cache_key in _sigma2_cache:
+        return _sigma2_cache[cache_key]
+        
+    # Validamos que la tanda existe en nuestros datos
     if tanda_label not in tandas:
-        raise ValueError(f"Etiqueta '{tanda_label}' no encontrada en tandas")
+        raise ValueError(f"Etiqueta '{tanda_label}' no encontrada en los datos.")
+        
+    # --- Comienza el cálculo físico ---
+    k = 2 * np.pi / wl
+    elev_rad = np.radians(elev_deg)
+    
+    # Calculamos la longitud de camino correcta para cada ángulo
+    L_path = np.where(elev_rad > 0, H_turb / np.sin(elev_rad), np.inf)
+    
+    # Obtenemos los datos de Cn² para la tanda seleccionada
     idx = np.where(tandas == tanda_label)[0][0]
-    cn2_vals = cn2[:, idx]  # 91 valores de Cn² para ángulos de elevación 0…90 (grados)
-
-    # 1) calculamos array de θ_cenital en grados: θ_cen[i] = 90 - elev[i]
-    theta_cen_deg = 90.0 - elev  # array de 90→0,89→1,…,0→90
-
-    # 2) convertimos a radianes:
-    theta_cen_rad = np.radians(theta_cen_deg)
-
-    # Interpolación lineal; fuera de rango, devuelve cn2_vals[0] o cn2_vals[-1]
-    f_cn2 = interp1d(
-        theta_cen_rad,   # pasa elev (grados) → radianes
-        cn2_vals,           # valores de Cn²
+    cn2_vals_for_tanda = cn2_table[:, idx]
+    
+    # Calculamos la tabla de sigma² para todos los ángulos
+    sigma2_vals = 1.23 * (k**(7/6)) * cn2_vals_for_tanda * (L_path**(11/6))
+    
+    # Creamos la función de interpolación final: elev_rad -> sigma²
+    f_sigma2 = interp1d(
+        elev_rad,
+        sigma2_vals,
         kind='linear',
         bounds_error=False,
-        fill_value=(cn2_vals[0], cn2_vals[-1])
+        fill_value=(sigma2_vals[0], sigma2_vals[-1])
     )
-    return f_cn2
-
-
-def get_f_cn2(loss_params):
-    """
-    Devuelve una función f_cn2(elev_rad) que interpola Cn² según la tanda indicada.
-    Si loss_params['tReadLoss'] es True, devuelve una función dummy.
-
-    Parameters
-    ----------
-    loss_params : dict
-        Debe contener:
-          - 'tReadLoss' (bool): si True, devuelve función dummy.
-          - 'tanda_label' (str): etiqueta de tanda para interpolar Cn².
-    """
-    if not loss_params.get('turbulencia', False):
-        return lambda *args, **kwargs: None
-
-    if loss_params.get('tReadLoss', False):
-        return lambda *args, **kwargs: None
-
-    tanda = loss_params.get('tanda_label', '')
-    if tanda == '':
-        raise ValueError("Para get_f_cn2, debes especificar 'tanda_label' en loss_params")
-    return make_f_cn2_local(tanda)
+    
+    # Guardamos la función en el caché y la devolvemos
+    _sigma2_cache[cache_key] = f_sigma2
+    return f_sigma2

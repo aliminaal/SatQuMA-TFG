@@ -1,0 +1,8 @@
+{
+    "python.pythonPath": "${workspaceFolder}/.venv/bin/python",
+    "python.analysis.useLibraryCodeForTypes": true,
+    "python.analysis.extraPaths": [
+      "${workspaceFolder}/.venv/lib/python3.11/site-packages"
+    ]
+  }
+  

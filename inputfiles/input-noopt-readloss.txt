@@ -47,7 +47,7 @@ False  # tOptimise
 # dt = Index for windowing time-slot arrays, e.g. A(t)[t0-dt:t0+dt]
 # In FS_loss_XI0.csv, 0 <= dt <= 346
 #******************************************************************************
-210, 220, 10 # dt_range = Start, stop, step index
+200, 350, 10    # dt_range = Start, stop, step index
 #******************************************************************************
 # ls = Excess system loss(es) in dB
 #******************************************************************************

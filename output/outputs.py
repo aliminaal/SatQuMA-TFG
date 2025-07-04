@@ -40,7 +40,7 @@ def get_data_header(protocol):
         header = "dt (s),ls (dB),QBERI,Pec,maxElev (deg),SKL (b),QBER,phiX," +\
                   "nX,nZ,mX,lambdaEC,sX0,sX1,vZ1,sZ1,mean photon no.,PxA," +\
                   "PxB,P1,P2,P3,mu1,mu2,mu3,eps_c,eps_s,Pap,NoPass," +\
-                  "fs (Hz),minElev (deg),shiftElev (deg),SysLoss (dB)"
+                  "fs (Hz),minElev (deg),shiftElev (deg),SysLoss (dB),sigma2,T_turb"
         return header
     else:
         print('There is no header for the requested protocol')

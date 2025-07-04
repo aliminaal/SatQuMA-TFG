@@ -292,7 +292,7 @@ def optimise_key(tInit,x,x0i,ci,mu3,xb,args,bounds,cons,options,opt_params,
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-def arrange_output(SysLoss,ls,dt,mu3,QBERI,Pec,theta_max,x,SKLdata,sys_params):
+def arrange_output(SysLoss,ls,dt,mu3,QBERI,Pec,theta_max,x,SKLdata,sys_params,sigma2_val,T_turb_val):
     """
     Put calculation output parameters into an ordered list.
 
@@ -319,6 +319,10 @@ def arrange_output(SysLoss,ls,dt,mu3,QBERI,Pec,theta_max,x,SKLdata,sys_params):
         Calculation output parameters.
     sys_params : dict
         Additional system parameters to be included in fulldata.
+    sigma2_val : float
+        Variance of Rytov parameter at maximum elevation.
+    T_turb_val : float
+        Turbulence transmissivity sample at maximum elevation.
 
     Returns
     -------
@@ -326,16 +330,16 @@ def arrange_output(SysLoss,ls,dt,mu3,QBERI,Pec,theta_max,x,SKLdata,sys_params):
         Ordered list of data to write out.
 
     """
-    # [dt,ls,QBERI,Pec,theta_max,SKL,QBERx,...]
+    # [dt,ls,QBERI,Pec,theta_max,SKL,QBERx,...,SysLoss,sigma2_val,T_turb_val]
     return [dt,ls,QBERI,Pec,sys_params[0],*SKLdata,x[0],*x[:3],1-x[1]-x[2],
-            *x[3:],mu3,*sys_params[1:],SysLoss]
+            *x[3:],mu3,*sys_params[1:],SysLoss,sigma2_val, T_turb_val]
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 def SKL_opt_loop_loss_and_time(count,ci,ni,theta_max,Pec,QBERI,ls_range,
                                dt_range,tInit,x,x0i,mu3,xb,args_fixed,bounds,
                                cons,options,opt_params,tPrint,fulldata,
-                               optdata,sys_params,sysLoss):
+                               optdata,sys_params,sysLoss,sigma2_val,T_turb_val):
     """
     Perfom secret key optimisations for iterated values of the transmission
     window half-width (dt) and the excess system loss (ls).
@@ -392,6 +396,10 @@ def SKL_opt_loop_loss_and_time(count,ci,ni,theta_max,Pec,QBERI,ls_range,
     sysLoss : float
         The nominal loss or system loss metric (dB). For symmetric transmission
         windows this is the system loss at zenith.
+    sigma2_val : float
+        Variance of Rytov parameter at maximum elevation.
+    T_turb_val : float
+        Turbulence transmissivity sample at maximum elevation.
 
     Returns
     -------
@@ -421,23 +429,21 @@ def SKL_opt_loop_loss_and_time(count,ci,ni,theta_max,Pec,QBERI,ls_range,
             res, SKLdata, optdata[ci[3]*ni[4] + ci[4],:], x0i[:,ci[0],ci[1],ci[2],ci[3],ci[4]] = \
                 optimise_key(tInit,x,x0i,ci,mu3,xb,args,bounds,cons,options,
                              opt_params,tPrint)
-            # Store output data
+            # Store output data - now includes sigma2_val and T_turb_val
             fulldata[ci[3]*ni[4] + ci[4],:] = arrange_output(sysLoss+ls,ls,dt,
                                                              mu3,QBERI,Pec,
                                                              theta_max,res.x,
                                                              SKLdata,
-                                                             sys_params)
+                                                             sys_params,sigma2_val,T_turb_val)
             count += 1 # Increment calculation counter
             ci[4] += 1 # dt loop counter
         ci[3] += 1 # ls loop counter
 
     return fulldata, optdata, x0i, count
 
-#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 def SKL_loop_loss_and_time(count,ci,ni,theta_max,Pec,QBERI,ls_range,dt_range,
                            x0,mu3,args_fixed,tPrint,fulldata,sys_params,
-                           sysLoss):
+                           sysLoss,sigma2_val,T_turb_val):
     """
     Perfom secret key (non-optimised) calculations for iterated values of the 
     transmission window half-width (dt) and the excess system loss (ls).
@@ -476,6 +482,10 @@ def SKL_loop_loss_and_time(count,ci,ni,theta_max,Pec,QBERI,ls_range,dt_range,
     sysLoss : float
         The nominal loss or system loss metric (dB). For symmetric transmission
         windows this is the system loss at zenith.
+    sigma2_val : float
+        Variance of Rytov parameter at maximum elevation.
+    T_turb_val : float
+        Turbulence transmissivity sample at maximum elevation.
 
     Returns
     -------
@@ -502,12 +512,12 @@ def SKL_loop_loss_and_time(count,ci,ni,theta_max,Pec,QBERI,ls_range,dt_range,
             SKL,QBERx,phi_x,nX,nZ,mX,lambdaEC,sX0,sX1,vz1,sZ1,mpn = key_length(x0,args)
             # Make a list of output data
             SKLdata = [SKL,QBERx,phi_x,nX,nZ,mX,lambdaEC,sX0,sX1,vz1,sZ1,mpn]
-            # Store output data
+            # Store output data - now includes sigma2_val and T_turb_val
             fulldata[ci[3]*ni[4] + ci[4],:] = arrange_output(sysLoss+ls,ls,dt,
                                                              mu3,QBERI,Pec,
                                                              theta_max,x0,
                                                              SKLdata,
-                                                             sys_params)
+                                                             sys_params,sigma2_val,T_turb_val)
             count += 1 # Increment calculation counter
             ci[4] += 1 # dt loop counter
         ci[3] += 1 # ls loop counter
@@ -517,7 +527,7 @@ def SKL_loop_loss_and_time(count,ci,ni,theta_max,Pec,QBERI,ls_range,dt_range,
 
 def SKL_sys_loop(count,ci,ni,x,x0i,xb,theta_max,dt_range,main_params,opt_params,
                  args_fixed,bounds,cons,options,header,opt_head,fulldata,optdata,
-                 multidata,sys_params,sysLoss):
+                 multidata,sys_params,sysLoss,sigma2_val,T_turb_val):
     """
     Calculate the SKL over the main iterated parameter loops. 
 
@@ -568,6 +578,10 @@ def SKL_sys_loop(count,ci,ni,x,x0i,xb,theta_max,dt_range,main_params,opt_params,
     sysLoss : float
         The nominal loss or system loss metric (dB). For symmetric transmission
         windows this is the system loss at zenith.
+    sigma2_val : float
+        Variance of Rytov parameter at maximum elevation.
+    T_turb_val : float
+        Turbulence transmissivity sample at maximum elevation.
 
     Returns
     -------
@@ -604,14 +618,15 @@ def SKL_sys_loop(count,ci,ni,x,x0i,xb,theta_max,dt_range,main_params,opt_params,
                                                cons,options,opt_params,
                                                main_params['out']['tPrint'],
                                                fulldata,optdata,sys_params,
-                                               sysLoss)
+                                               sysLoss,sigma2_val,T_turb_val)
             else:
                 # Calculate the SKL for a given set of protocol parameters
                 fulldata, count = \
                     SKL_loop_loss_and_time(count,ci,ni,theta_max,Pec,QBERI,
                                            ls_range,dt_range,x,mu3,args_fixed,
                                            main_params['out']['tPrint'],
-                                           fulldata,sys_params,sysLoss)
+                                           fulldata,sys_params,sysLoss,
+                                           sigma2_val,T_turb_val)
 
             # Stop clock and CPU timer
             tc1, tp1 = get_timings()
@@ -777,18 +792,22 @@ def SKL_main_loop(main_params,adv_params,x,x0i,xb,ci,ni,f_atm,bounds,cons,
         time0pos   = np.where(loss_data[:,0] == 0)[0][0]
         time0elev  = loss_data[time0pos,1] # Elevation angle at t = 0 (rads).
         time0shift = time0pos # Take a temporary copy to use later.
-
+        
+        # Extract sigma2 and T_turb values at t=0 (maximum elevation)
+        # Assuming columns 7 and 8 in loss_data contain sigma2 and T_turb respectively
+        if loss_data.shape[1] > 8:  # Check if these columns exist
+            sigma2_val = loss_data[time0pos, 7]  # sigma2 value at maximum elevation
+            T_turb_val = loss_data[time0pos, 8]  # T_turb value at maximum elevation
+        else:
+            # If columns don't exist, set default values or calculate them
+            sigma2_val = 0.0
+            T_turb_val = 1.0
+        
         # Nominal system loss: based on zenith coupling efficiency and nominal losses
-        # if xi == 0.0:
-        #     sysLoss = -10*(np.math.log10(FSeff[time0pos]) + np.math.log10(eta))
-        # else:
-        #     slm     = eta_loss_metric(hsat,h0,wvl,aT,aR,w0,f_atm,eta_int)
-        #     sysLoss = slm - 10*np.math.log10(eta)
         sysLoss = -10*(np.log10(FSeff[time0pos]) + 
                        np.log10(main_params['fixed']['eta']))
 
         # Maximum elevation angle (degs) of satellite pass
-        #max_elev = np.degrees(cvs[time0pos,1])
         max_elev = np.degrees(time0elev)
     
         if (main_params['fixed']['shift0'] != 0.0):
@@ -799,6 +818,11 @@ def SKL_main_loop(main_params,adv_params,x,x0i,xb,ci,ni,f_atm,bounds,cons,
                                                      np.radians(main_params['fixed']['shift0'])))[0][0]
             time0elev  = loss_data[time0pos,1] # New elevation angle at t = 0 (rads).
             time0shift = abs(time0pos - time0shift) # Shift in time slots between old and new t = 0.
+            
+            # Update sigma2 and T_turb values for the new t=0 position
+            if loss_data.shape[1] > 8:
+                sigma2_val = loss_data[time0pos, 7]
+                T_turb_val = loss_data[time0pos, 8]
         else:
             # No shift requested, t = 0 is at elev = 90 deg.
             time0shift = 0 # Reset this value to zero.
@@ -831,12 +855,12 @@ def SKL_main_loop(main_params,adv_params,x,x0i,xb,ci,ni,f_atm,bounds,cons,
         args_fixed = args_fixed_list(main_params['fixed'],adv_params['calc'],
                                      FSeff,time0pos)
         
-        # Run main SKL loops
+        # Run main SKL loops - pass sigma2_val and T_turb_val as additional parameters
         multidata, count = \
             SKL_sys_loop(count,ci,ni,x,x0i,xb,theta_max,dt_range,main_params,
                          adv_params['opt'],args_fixed,bounds,cons,options,
                          header,opt_head,fulldata,optdata,multidata,
-                         sys_params,sysLoss)
+                         sys_params,sysLoss,sigma2_val,T_turb_val)
             
         ci[0] += 1 # theta_max loop counter
 
