@@ -1,15 +1,15 @@
-#******************************************************************************
+#****************************************************************************** 
 # Select security protocol
 #******************************************************************************
-'aBB84-WCP' # protocol = QKD security protocol. Only 'efficient-BB84' available.
+'aBB84-WCP'      # protocol = QKD security protocol. Only 'efficient-BB84' available.
 
 #******************************************************************************
 # Select SKL calculation type via tOptimise
 #******************************************************************************
-#    True:  Optimise over the main protocol parameter and provide intial value.
+#    True:  Optimise over the main protocol parameter and provide initial value.
 #    False: Specify the main protocol parameter.
 #******************************************************************************
-True  # tOptimise
+True             # tOptimise
 
 #******************************************************************************
 # Initialise protocol parameters
@@ -17,11 +17,11 @@ True  # tOptimise
 #     tOptimise = True: lower bound, upper bound [, initial value]
 #     tOptimise = False: value
 #******************************************************************************
-0.3, 1.0, 0.5     # PxA_i = Asymmetric polarisation probability (0:1)
-0.6, 0.9999, 0.7  # pk1_i = Probability Alice prepares intensity 1 (0:1)
-0.0, 0.4, 0.1     # pk2_i = Probability Alice prepares intensity 2 (0:1)
-0.3, 1.0, 0.8     # mu1_i = Intensity 1 (0:1]
-0.1, 0.5, 0.3     # mu2_i = Intensity 2 (0:1]
+0.3, 1.0, 0.5    # PxA_i = Asymmetric polarisation probability (0:1)
+0.6, 0.9999, 0.7 # pk1_i = Probability Alice prepares intensity 1 (0:1)
+0.0, 0.4, 0.1    # pk2_i = Probability Alice prepares intensity 2 (0:1)
+0.3, 1.0, 0.8    # mu1_i = Intensity 1 (0:1]
+0.1, 0.5, 0.3    # mu2_i = Intensity 2 (0:1]
 
 #******************************************************************************
 # Fixed system parameters
@@ -31,55 +31,73 @@ True  # tOptimise
 1e-9       # eps_s   = Prescribed error in protocol secrecy
 0.01       # Pap     = Afterpulse probability [0:1]
 5e8        # fs      = Repetition rate of the source in Hz
-1         # NoPass  = Number of satellite passes
+1          # NoPass  = Number of satellite passes
 10.0       # minElev = Minimum elevation of orbit (deg)
 0.0        # shift0  = Angle to shift centre of transmission window (deg)
 
 #******************************************************************************
 # Define listed parameters: theta_max(xi), Pec and QBERI
 #******************************************************************************
-90.0 # theta_max = Max elevation of satellite orbit wrt receiver (deg)
-5e-7 # Pec       = Dark count probability [0:1]
-0.005    # QBERI   = Intrinsic quantum bit error rate (QBER_I)
+90.0       # theta_max = Max elevation of satellite orbit wrt receiver (deg)
+5e-7       # Pec       = Dark count probability [0:1]
+0.005      # QBERI     = Intrinsic quantum bit error rate (QBER_I)
 
 #******************************************************************************
 # Define (inclusive) range for looped parameters: ls and dt
 #******************************************************************************
-#******************************************************************************
 # dt = Index for windowing time-slot arrays, e.g. A(t)[t0-dt:t0+dt]
 # In FS_loss_XI0.csv, 0 <= dt <= 346
 #******************************************************************************
-200, 350, 10 # dt_range = Start, stop, step index
-#******************************************************************************
+200, 350, 10    # dt_range = Start, stop, step index
+
 # ls = Excess system loss(es) in dB
 #******************************************************************************
-0, 12, 7   # ls_range = Start, stop, No. of steps
+0, 12, 7         # ls_range = Start, stop, No. of steps
 
 #******************************************************************************
 # Loss options
 #******************************************************************************
-False  # tReadLoss = Read losses from a file?
+False    # 1) tReadLoss = Read losses from a file? (True/False)
 
 #******************************************************************************
-# Input file options
+# Si tReadLoss=False, a continuación deben ir exactamente estos 14 valores, en este orden:
+#   2) tWriteLoss
+#   3) atm_file
+#   4) loss_int    (float en dB—se convierte internamente a 10^(–loss_int/10))
+#   5) h_T         (float, sat altitude en m)
+#   6) h_R         (float, OGS altitude en m)
+#   7) aT          (float, transmitter aperture radius en m)
+#   8) aR          (float, receiver aperture radius en m)
+#   9) w0          (float, beam waist at focus en m)
+#   10) wvl        (float, wavelength en nm)
+#   11) R_E       (float, Earth radius en m)
+#   12) turbulencia (booleano)
+#   13) tanda_label (string)
+#   14) wavelength  (float en m)
+#   15) L          (float en m)
 #******************************************************************************
-True     # tWriteLoss = Write losses to a file?
-''       # atmfile = Name of atmospheric data file ('' = use default data)
-15       # eta_int = Intrinsic system loss
-500e3    # hsat = Satellite altitude in m
-0e3      # hOGS = Receiver altitude in m
-0.15     # aT = Transmitter aperture radii (m)
-0.6      # aR = Receiver aperture radii (m)
-0.15     # w0 = Beam waist at focus (m)
- 810    # wl = Wavelength (nm)
-6371e3   # R_E = Radius of the Earth (m)
+True        # 2) tWriteLoss = Write losses to file? (True/False)
+''          # 3) atm_file   = Name of atmospheric data file ('' = default)
+15          # 4) loss_int   = Intrinsic system loss (dB)
+500e3       # 5) h_T        = Satellite altitude en m
+0e3         # 6) h_R        = Receiver altitude en m
+0.15        # 7) aT         = Transmitter aperture radii (m)
+0.6         # 8) aR         = Receiver aperture radii (m)
+0.15        # 9) w0         = Beam waist at focus (m)
+850         # 10) wvl       = Wavelength en nm
+6371e3      # 11) R_E      = Radius of the Earth (m)
+
+True        # 12) turbulencia = Calculate turbulence? (True/False)
+tanda3_14.05# 13) tanda_label = Cn² profile to use (must match datos_cn2.tandas)
+850e-9      # 14) wavelength  = Wavelength en metros (ej. 850e-9)
+80000       # 15) L           = Link length en metros (ej. 80e3)
 
 #******************************************************************************
-# Output file options
+# Output file options (a partir de aquí ya se leen tPrint, tFullData, tdtOptData, tMetrics, out_path, out_base)
 #******************************************************************************
-True  # tPrint     = Print values to StdOut during calculations? True or False?
-True  # tFullData  = Write output to CSV file(s)? True or False?
-True  # tdtOptData = Write out all dt optimised data in a single file? True or False?
-True  # tMetrics   = Write out optimiser metrics? True or False?
-''    # out_path   = Path for output file (empty string = current directory)
-'out' # outbase    = Basename for output file(s) (excluding .csv)
+True      # tPrint     = Print valores por StdOut? (True/False)
+True      # tFullData  = Write output to CSV? (True/False)
+True      # tdtOptData = Write out all dt-optimised data en un solo archivo? (True/False)
+True      # tMetrics   = Write out optimiser metrics? (True/False)
+'./out'   # out_path   = Ruta para archivos de salida
+'results' # out_base   = Basename para archivos de salida (sin .csv)

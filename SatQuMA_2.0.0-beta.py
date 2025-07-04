@@ -5,7 +5,7 @@ Created on Mon May 10 17:20:58 2021
 @author: Duncan McArthur
 """
 
-from os.path import join
+from os.path import join,dirname, abspath
 
 from input.read_input import get_input
 from input.write_input import (print_header, print_input)
@@ -15,16 +15,16 @@ from key.get_key import SKL_main_loop
 from output.outputs import (out_arrays, get_timings, format_time)
 
 ###############################################################################
-
+base_dir = dirname(abspath(__file__))
 # Set the inpufile path and filename(s);
 # Path to input files, empty string means location of execution
-inputpath    = 'inputfiles'
+inputpath = join(base_dir, 'inputfiles')
 
 # File name for main input parameters
-filename     = 'input.txt'
+filename     = join(inputpath, 'input.txt')
 
 # File name for advanced/optional input parameters (optional)
-filename_adv = 'input-adv.txt'
+filename_adv = join(inputpath, 'input-adv.txt')
 
 ###############################################################################
 

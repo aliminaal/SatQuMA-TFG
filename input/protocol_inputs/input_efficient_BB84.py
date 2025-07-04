@@ -143,6 +143,7 @@ def convert_str_params(param_str):
     # Read losses from file? Otherwise generate
     loss_params['tReadLoss'] = str2bool(param_str[count])
     count += 1
+
     if loss_params['tReadLoss']:
         # Path to loss data file
         loss_params['loss_path'] = strip_quote_input(param_str[count])
@@ -152,16 +153,17 @@ def convert_str_params(param_str):
         count += 1
         # Column to read loss data from
         loss_params['loss_col']  = int(param_str[count])
+        count += 1
     else:
         # Write losses to file?
         loss_params['tWriteLoss'] = str2bool(param_str[count])
         count += 1
-        # Name of atmospheric data file (default is empty string)
+        # Name of atmospheric data file (default es cadena vacía)
         loss_params['atm_file'] = strip_quote_input(param_str[count])
         count += 1
         # Constant intrinsic system loss (dB)
         loss_int = float(param_str[count])
-        # Convert to efficiency
+        # Convertir a eficiencia
         loss_params['eta_int']  = 10**(-loss_int/10.0)
         count += 1
         # Transmitter altitude (m)
@@ -184,13 +186,31 @@ def convert_str_params(param_str):
         count += 1
         # Radius of the Earth (m)
         loss_params['R_E']       = float(param_str[count])
-        
-    count += 1
-        
+        count += 1
+
+        # ————— A partir de aquí, las 4 nuevas líneas —————
+        # ¿Calcular turbulencia?
+        loss_params['turbulencia'] = str2bool(param_str[count])
+        count += 1
+
+        # Etiqueta de la tanda (ej. 'tanda3_14.05')
+        loss_params['tanda_label'] = strip_quote_input(param_str[count])
+        count += 1
+
+        # Wavelength en metros (ej. 785e-9)
+        loss_params['wavelength'] = float(param_str[count])
+        count += 1
+
+        # Longitud de enlace L en metros (ej. 80e3)
+        loss_params['L'] = float(param_str[count])
+        count += 1
+        # ————— Fin de las líneas nuevas —————
+
     ###########################################################################
     # Output parameters
     ###########################################################################
     out_params, count = convert_str_params_out(param_str, count)
+
     
     ###########################################################################
     # Store parameter sets in a dictionary
@@ -481,6 +501,29 @@ def check_params(main_params,adv_params):
                 # Check parameters are graeter than zero
                 if main_params['loss'][p] <= 0:
                     raise ValueError('{} = {}'.format(p,main_params['loss'][p]))
+                
+                # ————— VALIDACIÓN DE LOS NUEVOS CAMPOS DE TURBULENCIA —————
+            if type(main_params['loss']['turbulencia']) is not bool:
+                raise TypeError("turbulencia debe ser bool, no {}".format(
+                    main_params['loss']['turbulencia']))
+
+            if main_params['loss']['turbulencia']:
+                # 1) Verificar que la tanda existe
+                from channel.Turbulence.pasosCn2 import tandas
+                if main_params['loss']['tanda_label'] not in tandas:
+                    raise ValueError("tanda_label desconocida: {}".format(
+                        main_params['loss']['tanda_label']))
+
+                # 2) Verificar que wavelength > 0
+                if main_params['loss']['wavelength'] <= 0:
+                    raise ValueError("wavelength inválido: {}".format(
+                        main_params['loss']['wavelength']))
+
+                # 3) Verificar que L > 0
+                if main_params['loss']['L'] <= 0:
+                    raise ValueError("L inválido: {}".format(
+                        main_params['loss']['L']))
+            # ————— FIN VALIDACIÓN DE TURBULENCIA —————
 
     ###########################################################################
     # Check the advanced parameters

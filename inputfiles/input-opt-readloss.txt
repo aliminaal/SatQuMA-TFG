@@ -59,14 +59,21 @@ True  # tOptimise
 #******************************************************************************
 # Loss options
 #******************************************************************************
-True  # tReadLoss = Read losses from a file?
+False  # tReadLoss = Read losses from a file?
 
 #******************************************************************************
 # Input file options
 #******************************************************************************
-''                # loss_path = Path to loss file (empty string = current directory).
-'FS_loss_XI0.csv' # loss_file = File containing loss data
-3                 # lc = Column containing loss data in file (counting from 1)
+True    # tWriteLoss = Write losses to a file?
+''      # atmfile = Name of atmospheric data file ('' = use default data)
+15      # eta_int = Intrinsic system loss
+500e3   # hsat = Satellite altitude in m
+0e3     # hOGS = Receiver altitude in m
+0.0725   # aT = Transmitter aperture radii (m)
+0.0725 # aR = Receiver aperture radii (m)
+0.15 # w0 = Beam waist at focus (m)
+850 # wl = Wavelength (nm)
+6371e3 # R_E = Radius of the Earth (m)
 
 #******************************************************************************
 # Output file options

@@ -13,8 +13,9 @@ from .diffraction.diffraction import diffract
 from .orbital.circular_polarorbit import (elevation, distance, tMax, 
                                           get_xi_from_theta)
 from .atmosphere.atmos_data import (make_f_atm, default_datafile)
+from .Turbulence.turbulencia import get_turbulence_for_angle
 
-__all__ = ['interp_atm_data','time_dependent_losses']
+__all__ = ['interp_atm_data','time_dependent_losses','get_losses']
 
 #############################################################################
 
@@ -47,7 +48,7 @@ def interp_atm_data(wl,datafile=None):
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-def time_dependent_losses(R,hsat,xi,hOGS,wl,aT,aR,w0,f_atm,eta_int):
+def time_dependent_losses(R,hsat,xi,hOGS,wl,aT,aR,w0,f_atm,eta_int, loss_params):
     """
     Generate time dependent loss array based on diffraction, atmospheric and
     inherent system losses.
@@ -183,7 +184,7 @@ def get_losses(theta_max,loss_params,f_atm,tPrint,outpath):
             time_dependent_losses(loss_params['R_E'],loss_params['h_T'],xi,
                                   loss_params['h_R'],loss_params['wvl'],
                                   loss_params['aT'],loss_params['aR'],
-                                  loss_params['w0'],f_atm,loss_params['eta_int'])
+                                  loss_params['w0'],f_atm,loss_params['eta_int'],loss_params)
         if loss_params['tWriteLoss']:
             loss_file = 'FS_loss_th_m_{:5.2f}_wl_{:.0f}nm_h_{}km_h1_{}km_aT_{}m_aR_{}m_w0_{}m.csv'.format(
                     np.degrees(theta_max),loss_params['wvl'],
